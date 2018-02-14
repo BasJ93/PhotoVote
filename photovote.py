@@ -11,6 +11,7 @@
 from flask import Flask, render_template, request, session, Markup
 import sqlite3
 import uuid
+from datetime import timedelta
 
 
 app = Flask(__name__)
@@ -19,7 +20,7 @@ app.secret_key = 'This is a really secret key for this app'
 @app.before_request
 def make_session_permanent():
     session.permanent = True
-    app.permanent_session_lifetime = 300
+    app.permanent_session_lifetime = timedelta(minutes = 5)
 
 @app.route('/')
 def index():

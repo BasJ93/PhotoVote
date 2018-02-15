@@ -39,8 +39,14 @@ def index():
             _rating = conn.execute('''select avg(RATING) from Ratings where PHOTOGRAPHER={_Photographer} and DAY=date('now');'''.format(_Photographer=row[0]))
         except sqlite3.Error as e:
             return render_template('error.html', error = str(e.args[0]))
+        _currentRating = 0
+        row2 = _rating.fetchone()
+        if row2 is None:
+            pass
+        else:
+            _currentRating = row2[0] or 0
         _overview = _overview + "<tr><td data-toggle='collapse' data-target='#{_photographer}' class='clickable'>{_photographer}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0])
-        _script = _script + "$('{_photographer}').starRating({{starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _rating.fetchone()[0] or 0)
+        _script = _script + "$('{_photographer}').starRating({{starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
     _overview = _overview + "</table>"
     _script = _script + "});</script>"
     return render_template('index.html', overview = Markup(_overview), script=Markup(_script))

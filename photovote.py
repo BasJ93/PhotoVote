@@ -36,7 +36,7 @@ def index():
     _script = "<script>$(document).ready( function() {"
     for row in _photographers:
         try:
-            _rating = conn.execute('''select RATING from Ratings where PHOTOGRAPHER={_Photographer} and DAY=date('now') and USER='{_User}';'''.format(_Photographer=row[0]), _User=session.get['uuid'])
+            _rating = conn.execute('''select RATING from Ratings where PHOTOGRAPHER={_Photographer} and DAY=date('now') and USER='{_User}';'''.format(_Photographer=row[0], _User=session.get('uuid')))
         except sqlite3.Error as e:
             return render_template('error.html', error = str(e.args[0]))
         _currentRating = 0

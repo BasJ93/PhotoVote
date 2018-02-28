@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <title>PhotoVote</title>
+  
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+    
+    <link href="../static/index.css" rel="stylesheet">
+
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+  </head>
+
+  <body>
+
+    <div class="container">
+        <div class="header">
+        <h3 class="text-muted">Photo Vote</h3>
+        </div>
+        
+        <div class="jumbotron">
+          <form class="form-signin" action="/add_photographer" method="post">
+		  <label for="inputPhotographer" class="sr-only">Username</label>
+          <input type="text" name="inputPhotographer" id="inputPhotographer" class="form-control" placeholder="Photographer" required autofocus>
+          <button id="btnSignIn" class="btn btn-lg btn-primary btn-block" type="submit">Add</button>
+          </form>
+        </div>
+        
+      <footer class="footer">
+        <p>&copy; Bas Janssen 2018</p>
+      </footer>
+    </div>
+  </body>
+</html>

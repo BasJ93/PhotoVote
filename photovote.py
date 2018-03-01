@@ -66,19 +66,14 @@ def overview():
                 return redirect('/')
             else:
                 try:
-                    _photographers = conn.execute('''select ID, NAME from Photographers;''')
+                    _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING) from Photographers inner join Ratings on Ratings.Photographer = Photographers.ID where Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
                 except sqlite3.Error as e:
                     return render_template('error.html', error = str(e.args[0]))
                 _overview = "<table class='table table-hover'><tr><th>Photographers</th></tr>"
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
-                    try:
-                        _rating = conn.execute('''select avg(RATING), sum(RATING) from Ratings where PHOTOGRAPHER={_Photographer} and DAY=date('now');'''.format(_Photographer=row[0]))
-                    except sqlite3.Error as e:
-                        return render_template('error.html', error = str(e.args[0]))
-                    row2 = _rating.fetchone()
-                    _overview = _overview + "<tr><td data-toggle='collapse' data-target='#{_photographer}' class='clickable'>{_photographer}</td><td>{_TotalScore}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _TotalScore = row2[1] or 0)
-                    _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row2[0] or 0)
+                    _overview = _overview + "<tr><td>{_photographer}</td><td>{_TotalScore}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _TotalScore = row[3] or 0)
+                    _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[2] or 0)
                 _overview = _overview + "</table>"
                 _script = _script + "});</script>"
                 _navbar = "<nav><ul class='nav nav-pills float-right'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></nav>"
@@ -108,21 +103,23 @@ def login():
             _username = request.form['inputUsername']
             _password = request.form['inputPassword']
         except Exception as e:
-            return render_template('error.html', error = str(e))
-        
+            return render_template('error.html', error = str(e))        
         try:
             _pw_hashes = conn.execute("select PASSWORDHASH, UUID from Admin where NAME='{_user}';".format(_user = _username))
-            for _pw_hash in _pw_hashes:
-                pw_hash = _pw_hash[0]
-                uuid = _pw_hash[1]
         except sqlite3.Error as e:
             return render_template('error.html', error = str(e.args[0]))
-        if check_password_hash(pw_hash, _password):
-            session['user'] = _username
-            session['uuid'] = uuid
-            return redirect('/overview')
-        else:
-            return render_template('error.html',error = 'Invalid password.')
+        for _pw_hash in _pw_hashes:
+            if _pw_hash is None:
+                return redirect('/login')
+            else:
+                pw_hash = _pw_hash[0]
+                uuid = _pw_hash[1]
+                if check_password_hash(pw_hash, _password):
+                    session['user'] = _username
+                    session['uuid'] = uuid
+                    return redirect('/overview')
+                else:
+                    return render_template('error.html',error = 'Invalid password.')
     
     return render_template("login.html", path=Markup("login"), action=Markup("Login"))
     

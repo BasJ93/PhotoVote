@@ -22,7 +22,7 @@ app.secret_key = 'This is a really secret key for this app'
 @app.before_request
 def make_session_permanent():
     session.permanent = True
-    app.permanent_session_lifetime = timedelta(minutes = 5)
+    app.permanent_session_lifetime = timedelta(minutes = 360)
 
 @app.route('/')
 def index():
@@ -31,7 +31,7 @@ def index():
     else:
         session['uuid'] = uuid.uuid4()
     try:
-        _photographers = conn.execute('''select ID, NAME from Photographers;''')
+        _photographers = conn.execute('''select ID, NAME from Photographers order by NAME desc;''')
     except sqlite3.Error as e:
         return render_template('error.html', error = str(e.args[0]))
     _overview = "<table class='table table-hover'><tr><th>Photographers</th></tr>"
@@ -47,11 +47,11 @@ def index():
             pass
         else:
             _currentRating = row2[0] or 0
-        _overview = _overview + "<tr><td data-toggle='collapse' data-target='#{_photographer}' class='clickable'>{_photographer}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0])
+        _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[1])
         _script = _script + "$('{_photographer}').starRating({{starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
     _overview = _overview + "</table>"
     _script = _script + "});</script>"
-    _navbar = "<nav><ul class='nav nav-pills float-right'><li class='nav-item'><a class='nav-link active' href='/login'>Login</a></li></ul></nav>"
+    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/login'>Login</a></li></ul></div></nav>"
     return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
 
 @app.route('/overview')
@@ -66,17 +66,18 @@ def overview():
                 return redirect('/')
             else:
                 try:
-                    _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING) from Photographers inner join Ratings on Ratings.Photographer = Photographers.ID where Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
+                    _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING), COUNT(RATING) from Photographers inner join Ratings on Ratings.Photographer = Photographers.ID where Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
                 except sqlite3.Error as e:
                     return render_template('error.html', error = str(e.args[0]))
-                _overview = "<table class='table table-hover'><tr><th>Photographers</th></tr>"
+                _overview = "<table class='table table-hover'><tr><th>Photographers</th><th>Votes</th><th>Total score</th><th>Average score</th><th>Remove</th></tr>"
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
-                    _overview = _overview + "<tr><td>{_photographer}</td><td>{_TotalScore}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _TotalScore = row[3] or 0)
+                    _overview = _overview + "<tr><td>{_name}</td><td>{_votes}</td><td>{_TotalScore}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td><td><button type='button' class='btn btn-danger' id='btn-{_photographer}'>Remove</button></td></tr>".format(_photographer = row[0], _name = row[1], _TotalScore = row[3] or 0, _votes = row[4] or 0)
                     _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[2] or 0)
                 _overview = _overview + "</table>"
+                _script = _script + "$('button').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});});"
                 _script = _script + "});</script>"
-                _navbar = "<nav><ul class='nav nav-pills float-right'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></nav>"
+                _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></div></nav>"
                 return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
         else:
             return redirect('/')
@@ -87,7 +88,7 @@ def overview():
 def addRating():
     if session.get('uuid'):    
         try:
-            conn.cursor().execute("insert or replace into Ratings (ID, RATING, USER, PHOTOGRAPHER, DAY) values ((select ID from Ratings where USER = '{_User}' and PHOTOGRAPHER = '{_Photographer}' and DAY=date('now')), '{_Rating}', '{_User}', (select ID from Photographers where NAME='{_Photographer}'), (date('now')));".format(_Photographer=request.form['id'], _Rating=request.form['rating'], _User=session.get('uuid')))
+            conn.cursor().execute("insert or replace into Ratings (ID, RATING, USER, PHOTOGRAPHER, DAY) values ((select ID from Ratings where USER = '{_User}' and PHOTOGRAPHER = '{_Photographer}' and DAY=date('now')), '{_Rating}', '{_User}', '{_Photographer}', (date('now')));".format(_Photographer=request.form['id'], _Rating=request.form['rating'], _User=session.get('uuid')))
             conn.commit()
         except sqlite3.Error as e:
             print e.args[0]
@@ -121,7 +122,20 @@ def login():
                 else:
                     return render_template('error.html',error = 'Invalid password.')
     
-    return render_template("login.html", path=Markup("login"), action=Markup("Login"))
+    if session.get('uuid'):
+        if session.get('user'):
+            try:
+                _admins = conn.execute("select ID from Admin where NAME='{_Username}' and UUID='{_uuid}';".format(_Username = session.get('user'), _uuid = session.get('uuid')))
+            except sqlite3.Error as e:
+                return render_template('error.html', error = str(e.args[0]))
+            if _admins.fetchone() is None:
+                return render_template("login.html", path=Markup("login"), action=Markup("Login"))
+            else:
+                return redirect('/overview')
+        else:
+            return render_template("login.html", path=Markup("login"), action=Markup("Login"))
+    else:
+        return render_template("login.html", path=Markup("login"), action=Markup("Login"))
     
 @app.route("/logout")
 def logout():
@@ -156,6 +170,35 @@ def add_photographer():
             return redirect('/')
     else:
         return redirect('/')
+
+@app.route("/removePhotographer", methods=['POST'])
+def removePhotographer():
+    if session.get('uuid'):
+        if session.get('user'):
+            try:
+                _admins = conn.execute("select ID from Admin where NAME='{_Username}' and UUID='{_uuid}';".format(_Username = session.get('user'), _uuid = session.get('uuid')))
+            except sqlite3.Error as e:
+                return render_template('error.html', error = str(e.args[0]))
+            if _admins.fetchone() is None:
+                return "invalid"
+            else:
+                    try:
+                        data = request.form['id'].split("-")
+                        photographer = data[1]
+                    except Exception as e:
+                        print (e)
+                        return "invalid"
+                    try:
+                        conn.execute("delete from Ratings where PHOTOGRAPHER='{_photographer}';".format(_photographer = photographer))
+                        conn.commit()
+                        conn.execute("delete from Photographers where ID='{_photographer}';".format(_photographer = photographer))
+                        conn.commit()
+                    except sqlite3.Error as e:
+                        print (e)
+                        return "invalid"
+                    return "ok"
+        else:
+            return "invalid"
 
 @app.route("/add_admin", methods=['GET', 'POST'])
 def add_admin():

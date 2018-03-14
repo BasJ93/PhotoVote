@@ -69,12 +69,12 @@ def overview():
                     _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
                 except sqlite3.Error as e:
                     return render_template('error.html', error = str(e.args[0]))
-                _overview = "<table class='table table-hover'><tr><th>Photographer</th><th>Votes</th><th>Total score</th><th>Average score</th><th>Remove</th></tr>"
+                _overview = "<div class='table-responsive'><table class='table table-hover'><tr><th>Photographer</th><th>Votes</th><th>Total score</th><th>Average score</th><th>Remove</th></tr>"
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
                     _overview = _overview + "<tr><td>{_name}</td><td>{_votes}</td><td>{_TotalScore}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td><td><button type='button' class='btn btn-danger' id='btn-{_photographer}'>Remove</button></td></tr>".format(_photographer = row[0], _name = row[1], _TotalScore = row[3] or 0, _votes = row[4] or 0)
                     _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[2] or 0)
-                _overview = _overview + "</table>"
+                _overview = _overview + "</table></div>"
                 _script = _script + "$('button').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});});"
                 _script = _script + "});</script>"
                 _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></div></nav>"

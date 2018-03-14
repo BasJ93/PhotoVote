@@ -31,7 +31,7 @@ def index():
     else:
         session['uuid'] = uuid.uuid4()
     try:
-        _photographers = conn.execute('''select ID, NAME from Photographers order by NAME desc;''')
+        _photographers = conn.execute('''select ID, NAME from Photographers order by cast(NAME as int) asc;''') #A really dirty hack, but names are currently set as just integers. Perhaps change the table with a display name collumn.
     except sqlite3.Error as e:
         return render_template('error.html', error = str(e.args[0]))
     _overview = "<table class='table table-hover'><tr><th>Photographers</th></tr>"
@@ -48,7 +48,7 @@ def index():
         else:
             _currentRating = row2[0] or 0
         _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[1])
-        _script = _script + "$('{_photographer}').starRating({{starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
+        _script = _script + "$('{_photographer}').starRating({{useFullStars: true, starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
     _overview = _overview + "</table>"
     _script = _script + "});</script>"
     _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/login'>Login</a></li></ul></div></nav>"
@@ -66,10 +66,10 @@ def overview():
                 return redirect('/')
             else:
                 try:
-                    _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING), COUNT(RATING) from Photographers inner join Ratings on Ratings.Photographer = Photographers.ID where Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
+                    _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
                 except sqlite3.Error as e:
                     return render_template('error.html', error = str(e.args[0]))
-                _overview = "<table class='table table-hover'><tr><th>Photographers</th><th>Votes</th><th>Total score</th><th>Average score</th><th>Remove</th></tr>"
+                _overview = "<table class='table table-hover'><tr><th>Photographer</th><th>Votes</th><th>Total score</th><th>Average score</th><th>Remove</th></tr>"
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
                     _overview = _overview + "<tr><td>{_name}</td><td>{_votes}</td><td>{_TotalScore}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td><td><button type='button' class='btn btn-danger' id='btn-{_photographer}'>Remove</button></td></tr>".format(_photographer = row[0], _name = row[1], _TotalScore = row[3] or 0, _votes = row[4] or 0)
@@ -77,7 +77,7 @@ def overview():
                 _overview = _overview + "</table>"
                 _script = _script + "$('button').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});});"
                 _script = _script + "});</script>"
-                _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></div></nav>"
+                _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></div></nav>"
                 return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
         else:
             return redirect('/')

@@ -31,7 +31,7 @@ def index():
     else:
         session['uuid'] = uuid.uuid4()
     try:
-        _photographers = conn.execute('''select ID, NAME from Photographers order by cast(NAME as int) asc;''') #A really dirty hack, but names are currently set as just integers. Perhaps change the table with a display name collumn.
+        _photographers = conn.execute('''select ID, NAME, NUMBER from Photographers order by NUMBER asc;''') #A really dirty hack, but names are currently set as just integers. Perhaps change the table with a display name collumn.
     except sqlite3.Error as e:
         return render_template('error.html', error = str(e.args[0]))
     _overview = "<table class='table table-hover'><tr><th>Photographers</th></tr>"
@@ -47,7 +47,7 @@ def index():
             pass
         else:
             _currentRating = row2[0] or 0
-        _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[1])
+        _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[2])
         _script = _script + "$('{_photographer}').starRating({{useFullStars: true, starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
     _overview = _overview + "</table>"
     _script = _script + "});</script>"
@@ -66,16 +66,16 @@ def overview():
                 return redirect('/')
             else:
                 try:
-                    _photographers = conn.execute('''select Photographers.ID, NAME, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
+                    _photographers = conn.execute('''select Photographers.ID, NAME, NUMBER, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;''')
                 except sqlite3.Error as e:
                     return render_template('error.html', error = str(e.args[0]))
                 _overview = "<div class='table-responsive'><table class='table table-hover'><thead><tr><th id='PhotographerHead'>Photographer</th><th>Average score</th></tr></thead>" #<th>Votes</th><th>Total score</th>
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
-                    _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[3] or 0, _votes = row[4] or 0)
-                    _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[2] or 0)
+                    _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                    _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
                 _overview = _overview + "</table></div>"
-                _script = _script + "$('.btn-danger').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});});"
+                _script = _script + "$('.btn-danger').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});location.reload(true);});"
                 _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');}});</script>"
                 _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></div></nav>"
                 return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
@@ -156,10 +156,11 @@ def add_photographer():
                 if request.method == 'POST':
                     try:
                         photographer = request.form['inputPhotographer']
+                        number = request.form['inputNumber']
                     except Exception as e:
                         return render_template('error.html', error = str(e))
                     try:
-                        conn.execute("insert into Photographers (NAME) values ('{_photographer}');".format(_photographer = photographer))
+                        conn.execute("insert into Photographers (NAME, NUMBER) values ('{_photographer}', '{_number}');".format(_photographer = photographer, _number = number))
                         conn.commit()
                     except sqlite3.Error as e:
                         return render_template('error.html', error = str(e.args[0]))

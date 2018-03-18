@@ -17,8 +17,10 @@
         </div>
         <div class="jumbotron">
           <form class="form-signin" action="/add_photographer" method="post">
-		  <label for="inputPhotographer" class="sr-only">Username</label>
+		  <label for="inputPhotographer" class="sr-only">Photographer</label>
           <input type="text" name="inputPhotographer" id="inputPhotographer" class="form-control" placeholder="Photographer" required autofocus>
+		  <label for="inputNumber" class="sr-only">Photo number</label>
+		  <input type="text" name="inputNumber" id="inputNumber" class="form-control" placeholder="1" required>
           <button id="btnSignIn" class="btn btn-lg btn-primary btn-block" type="submit">Add</button>
           </form>
         </div>

@@ -84,7 +84,7 @@ def overview():
                         _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
                 _overview = _overview + "</table></div>"
-                _script = _script + "$('.btn-danger').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});location.reload(true);});"
+                _script = _script + "$('.btn-danger').click(function(event){$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});});"
                 _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');}"
                 _script = _script + "$('#NameNumber').change(function(){$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)});});});</script>"
                 if NameNumber:
@@ -282,7 +282,7 @@ if __name__=="__main__":
     conn = sqlite3.connect('photovote.db')
     conn.execute('''PRAGMA foreign_keys = ON;''')
     conn.execute('''create table if not exists Admin(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, UUID TEXT, NAME TEXT, PASSWORDHASH TEXT);''') #The password must be hashed, plaintext can not be used.
-    conn.execute('''create table if not exists Photographers(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, NAME TEXT NOT NULL);''')
+    conn.execute('''create table if not exists Photographers(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, NAME TEXT NOT NULL, NUMBER INTEGER NOT NULL);''')
     conn.execute('''create table if not exists Ratings(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, RATING REAL NOT NULL, DAY TEXT NOT NULL, USER TEXT NOT NULL, PHOTOGRAPHER INT NOT NULL, FOREIGN KEY(PHOTOGRAPHER) REFERENCES PHOTOGRAPHERS(ID));''')
     conn.execute('''create table if not exists Settings(NAME TEXT PRIMARY KEY UNIQUE NOT NULL, VALUE TEXT NOT NULL);''')
     

@@ -15,6 +15,7 @@ import uuid
 from datetime import timedelta
 import getpass
 
+NameNumber = False
 
 app = Flask(__name__)
 app.secret_key = 'This is a really secret key for this app'
@@ -26,6 +27,7 @@ def make_session_permanent():
 
 @app.route('/')
 def index():
+    global NameNumber
     if session.get('uuid'):
         pass
     else:
@@ -47,7 +49,10 @@ def index():
             pass
         else:
             _currentRating = row2[0] or 0
-        _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[2])
+        if NameNumber:
+            _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[1])
+        else:
+            _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[2])
         _script = _script + "$('{_photographer}').starRating({{useFullStars: true, starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
     _overview = _overview + "</table>"
     _script = _script + "});</script>"
@@ -56,6 +61,7 @@ def index():
 
 @app.route('/overview')
 def overview():
+    global NameNumber
     if session.get('uuid'):
         if session.get('user'):
             try:
@@ -72,12 +78,19 @@ def overview():
                 _overview = "<div class='table-responsive'><table class='table table-hover'><thead><tr><th id='PhotographerHead'>Photographer</th><th>Average score</th></tr></thead>" #<th>Votes</th><th>Total score</th>
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
-                    _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                    if NameNumber:
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                    else:
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
                 _overview = _overview + "</table></div>"
                 _script = _script + "$('.btn-danger').click(function(event){$.post('removePhotographer', {'id': $(event.target).attr('id')});location.reload(true);});"
-                _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');}});</script>"
-                _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li></ul></div></nav>"
+                _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');}"
+                _script = _script + "$('#NameNumber').change(function(){$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)});});});</script>"
+                if NameNumber:
+                    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li><li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary active'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li></ul></div></nav>".format(_state = NameNumber)
+                else:
+                    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li><li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li></ul></div></nav>".format(_state = NameNumber)
                 return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
         else:
             return redirect('/')
@@ -231,6 +244,39 @@ def add_admin():
     else:
         return redirect('/')
 
+@app.route("/changenamenumber", methods=['POST'])
+def changenamenumber():
+    global NameNumber
+    if session.get('uuid'):
+        if session.get('user'):
+            try:
+                _admins = conn.execute("select ID from Admin where NAME='{_Username}' and UUID='{_uuid}';".format(_Username = session.get('user'), _uuid = session.get('uuid')))
+            except sqlite3.Error as e:
+                return render_template('error.html', error = str(e.args[0]))
+            if _admins.fetchone() is None:
+                return "nok"
+            else:
+                if request.method == 'POST':
+                    try:
+                        _state = request.form['state']
+                    except Exception as e:
+                        return "nok"
+                    try:
+                            conn.execute("update Settings Set VALUE='{_State}' where NAME='NameNumber';".format(_State = _state))
+                            conn.commit()
+                    except sqlite3.Error as e:
+                        return "nok"
+                    if _state == "false":
+                        NameNumber = False
+                    else:
+                        NameNumber = True
+                    return "ok"
+                else:
+                    return "nok"
+        else:
+            return "nok"
+    else:
+        return "nok"
 
 if __name__=="__main__":
     conn = sqlite3.connect('photovote.db')
@@ -238,6 +284,7 @@ if __name__=="__main__":
     conn.execute('''create table if not exists Admin(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, UUID TEXT, NAME TEXT, PASSWORDHASH TEXT);''') #The password must be hashed, plaintext can not be used.
     conn.execute('''create table if not exists Photographers(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, NAME TEXT NOT NULL);''')
     conn.execute('''create table if not exists Ratings(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, RATING REAL NOT NULL, DAY TEXT NOT NULL, USER TEXT NOT NULL, PHOTOGRAPHER INT NOT NULL, FOREIGN KEY(PHOTOGRAPHER) REFERENCES PHOTOGRAPHERS(ID));''')
+    conn.execute('''create table if not exists Settings(NAME TEXT PRIMARY KEY UNIQUE NOT NULL, VALUE TEXT NOT NULL);''')
     
     try:
         _admins = conn.execute("select ID from Admin;")
@@ -255,7 +302,20 @@ if __name__=="__main__":
         print("Thank you, Admin has been added.")
         username = None
         password = None
-        
+    
+    try:
+        _Results = conn.execute("select VALUE from Settings where NAME='NameNumber';")
+        conn.commit()
+    except sqlite3.Error as e:
+        print (str(e.args[0]))
+    _NameNumber = _Results.fetchone()
+    if _NameNumber is None:
+        print "Something went wrong with the settings."
+    else:
+        if _NameNumber[0] == "true":
+            NameNumber = True
+        else:
+            NameNumber = False
     app.run(host='127.0.0.1', port=8000)
     
     while True:

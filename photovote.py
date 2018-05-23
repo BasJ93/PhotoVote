@@ -126,18 +126,17 @@ def login():
             _pw_hashes = query_db("select PASSWORDHASH, UUID from Admin where NAME=?;", (_username,), True)
         except sqlite3.Error as e:
             return render_template('error.html', error = str(e.args[0]))
-        for _pw_hash in _pw_hashes:
-            if _pw_hash is None:
-                return redirect('/login')
+        if _pw_hashes is None:
+            return redirect('/login')
+        else:
+            pw_hash = _pw_hashes[0]
+            uuid = _pw_hashes[1]
+            if check_password_hash(pw_hash, _password):
+                session['user'] = _username
+                session['uuid'] = uuid
+                return redirect('/overview')
             else:
-                pw_hash = _pw_hash[0]
-                uuid = _pw_hash[1]
-                if check_password_hash(pw_hash, _password):
-                    session['user'] = _username
-                    session['uuid'] = uuid
-                    return redirect('/overview')
-                else:
-                    return render_template('error.html',error = 'Invalid password.')
+                return render_template('error.html',error = 'Invalid password.')
     
     if session.get('uuid'):
         if session.get('user'):
@@ -343,7 +342,7 @@ if __name__=="__main__":
         query_db('''create table if not exists Settings(NAME TEXT PRIMARY KEY UNIQUE NOT NULL, VALUE TEXT NOT NULL);''')
     
         try:
-            _admins = query_db("select ID from Admin;")
+            _admins = query_db("select ID from Admin;", (), True)
         except sqlite3.Error as e:
             print (str(e.args[0]))
         if _admins is None:

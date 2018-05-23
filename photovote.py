@@ -8,7 +8,7 @@
 #@author: Bas Janssen
 #"""
 
-from flask import Flask, render_template, request, session, Markup, redirect, g
+from flask import Flask, render_template, request, session, Markup, redirect, g, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import uuid
@@ -84,18 +84,42 @@ def overview():
                 _script = "<script>$(document).ready( function() {"
                 for row in _photographers:
                     if NameNumber:
-                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     else:
-                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td></tr></tbody>".format(_photographer = row[0], _name = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td></tr></tbody>".format(_photographer = row[0], _name = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
                 _overview = _overview + "</table></div>"
                 _script = _script + "$('.btn-danger').click(function(event){$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});});"
                 _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');}"
                 _script = _script + "$('#NameNumber').change(function(){$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)});});});</script>"
                 if NameNumber:
-                    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li><li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary active'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li></ul></div></nav>".format(_state = NameNumber)
+                    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'>\n\
+                <a class='navbar-brand' href='/'>Photo Vote</a>\n\
+                <button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button>\n\
+                <div class='collapse navbar-collapse' id='collapsingNavbar'>\n\
+                    <ul class='navbar-nav ml-auto'>\n\
+                        <li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary active'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li>\n\
+                        <li class='nav-item'><a class='nav-link' href='/export_results' target='_blank'>Export Results</a></li>\n\
+                        <li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li>\n\
+                        <li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li>\n\
+                        <li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li>\n\
+                    </ul>\n\
+                </div>\n\
+            </nav>".format(_state = NameNumber)
                 else:
-                    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><a class='navbar-brand' href='/'>Photo Vote</a><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li><li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li><li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li><li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li></ul></div></nav>".format(_state = NameNumber)
+                    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'>\n\
+                <a class='navbar-brand' href='/'>Photo Vote</a>\n\
+                <button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button>\n\
+                <div class='collapse navbar-collapse' id='collapsingNavbar'>\n\
+                    <ul class='navbar-nav ml-auto'>\n\
+                        <li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li>\n\
+                        <li class='nav-item'><a class='nav-link' href='/export_results' target='_blank'>Export Results</a></li>\n\
+                        <li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li>\n\
+                        <li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li>\n\
+                        <li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li>\n\
+                    </ul>\n\
+                </div>\n\
+            </nav>".format(_state = NameNumber)
                 return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
         else:
             return redirect('/')
@@ -307,6 +331,28 @@ def changenamenumber():
             return "nok"
     else:
         return "nok"
+
+@app.route("/export_results")
+def export_results():
+    if session.get('uuid'):
+        if session.get('user'):
+            try:
+                _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
+            except sqlite3.Error as e:
+                return render_template('error.html', error = str(e.args[0]))
+            if _admins is None:
+                return "nok"
+            else:
+                csv = "Name, Number, Avg Points, Total Points, Number of votes\n"
+                results = query_db("select Photographers.ID, NAME, NUMBER, avg(RATING) AS AVG, sum(RATING) AS TOTAL, COUNT(RATING) AS VOTES from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;")
+                for row in results:
+                    csv = csv + "{_Name}, {_Number}, {_Avg}, {_Total}, {_Count}\n".format(_Name = row['NAME'], _Number=row['Number'], _Avg=row['AVG'], _Total=row['TOTAL'], _Count=row['VOTES'])
+                response = make_response(csv)
+                cd = 'attachment; filename=results.csv'
+                response.headers['Content-Disposition'] = cd
+                response.mimetype='text/csv'
+                
+                return response
 
 def get_db():
     db = getattr(g, '_database', None)

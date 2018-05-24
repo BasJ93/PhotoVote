@@ -288,7 +288,7 @@ def add_admin():
                     except Exception as e:
                         return render_template('error.html', error = str(e))
                     try:
-                        query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (uuid.uuid4(), _username, generate_password_hash(_password)))
+                        query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (str(uuid.uuid4()), _username, generate_password_hash(_password)))
                     except sqlite3.Error as e:
                         return render_template('error.html', error = str(e.args[0]))
                     return redirect('/overview')
@@ -386,6 +386,7 @@ if __name__=="__main__":
         query_db('''create table if not exists Photographers(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, NAME TEXT NOT NULL, NUMBER INTEGER NOT NULL);''')
         query_db('''create table if not exists Ratings(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, RATING REAL NOT NULL, DAY TEXT NOT NULL, USER TEXT NOT NULL, PHOTOGRAPHER INT NOT NULL, FOREIGN KEY(PHOTOGRAPHER) REFERENCES PHOTOGRAPHERS(ID));''')
         query_db('''create table if not exists Settings(NAME TEXT PRIMARY KEY UNIQUE NOT NULL, VALUE TEXT NOT NULL);''')
+        query_db('''insert into Settings (NAME, VALUE) values ('NameNumber', 'false');''')
     
         try:
             _admins = query_db("select ID from Admin;", (), True)
@@ -396,7 +397,7 @@ if __name__=="__main__":
             username = raw_input("Username: ")
             password = getpass.getpass("Password: ")
             try:
-                query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (uuid.uuid4(), username, generate_password_hash(password)))
+                query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (str(uuid.uuid4()), username, generate_password_hash(password)))
             except sqlite3.Error as e:
                 print (str(e.args[0]))
             print("Thank you, Admin has been added.")

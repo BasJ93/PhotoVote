@@ -84,12 +84,13 @@ def overview():
                 _script = _script + "\n\t\t\t\t\t$(document).ready( function() {\n"
                 for row in _photographers:
                     if NameNumber:
-                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     else:
-                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td></tr></tbody>".format(_photographer = row[0], _name = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_number}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     _script = _script + "\t\t\t\t\t\t$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});\n".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
                 _overview = _overview + "</table></div>"
-                _script = _script + "\t\t\t\t\t\t$('.btn-danger').click(function(event){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});\n\t\t\t\t\t\t});\n"
+                _script = _script + "\t\t\t\t\t\t$('.btn-warning').click(function(event){\n\t\t\t\t\t\t\tvar IDnumber = $(event.target).attr('id').split('-');$('#ExistingID').val(IDnumber[2]);\n$('#inputChangePhotographer').val($('#Name-ID-'+IDnumber[2]).val());\n$('#inputChangeNumber').val($('#Number-ID-'+IDnumber[2]).val());\n$('#changePhotographerModal').modal('show');\n\t\t\t\t\t\t});\n"
+                _script = _script + "\t\t\t\t\t\t$('.btn-danger').click(function(event){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});})\n"#
                 _script = _script + "\t\t\t\t\t\tif($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n"
                 _script = _script + "\t\t\t\t\t\t$('#NameNumber').change(function(){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)})\n\t\t\t\t\t\t;});\n"
                 _script = _script + "\t\t\t\t\t\t$('#addPhotographerBtn').click(\n\
@@ -100,6 +101,15 @@ def overview():
     			 					//Refresh the table when it has been made dynamic.\n\
     		 						location.reload(true)\n\
     	 							});\n\
+    					});\n\
+                         $('#changePhotographerBtn').click(\n\
+        		 			function(event) {\n\
+        		 				$.ajax({method: 'POST', url: 'changePhotographer', data: {'ExistingID': $('#ExistingID').val(), 'inputPhotographer': $('#inputChangePhotographer').val(), 'inputNumber': $('#inputChangeNumber').val()}}).done(\n\
+        		 					function(html){\n\
+        			 					//Trigger a toast popup confirming the add was successful.\n\
+        			 					//Refresh the table when it has been made dynamic.\n\
+        		 						location.reload(true)\n\
+        	 							});\n\
     					});\n\
         				$('#addAdminBtn').click(\n\
         		 			function(event) {\n\
@@ -175,6 +185,36 @@ def overview():
 			  <!-- Modal footer -->\
 			  <div class='modal-footer'>\
 				<button type='button' class='btn btn-success' id='addPhotographerBtn'>Add</button><button type='button' class='btn btn-danger' data-dismiss='modal'>Close</button>\
+			  </div>\
+\
+			</div>\
+		  </div>\
+		</div>\
+  <!-- The Change Photographer Modal -->\
+		<div class='modal' id='changePhotographerModal'>\
+		  <div class='modal-dialog'>\
+			<div class='modal-content'>\
+\
+			  <!-- Modal Header -->\
+			  <div class='modal-header'>\
+				<h4 class='modal-title' id='titleChangePhotographer'>Change Photographer</h4>\
+				<button type='button' class='close' data-dismiss='modal'>&times;</button>\
+			  </div>\
+\
+			  <!-- Modal body -->\
+			  <div class='modal-body'>\
+			  	<form  class='form-signin'>\
+					<label for='inputChangePhotographer' class='sr-only'>Photographer</label>\
+				  	<input type='text' name='inputChangePhotographer' id='inputChangePhotographer' class='form-control' placeholder='Photographer' required autofocus>\
+				  	<label for='inputChangeNumber' class='sr-only'>Photo number</label>\
+				  	<input type='text' name='inputChangeNumber' id='inputChangeNumber' class='form-control' placeholder='1' required>\
+                           <input type='hidden' name='ExistingID' id='ExistingID'>\n\
+			  	</form>\
+			  </div>\
+\
+			  <!-- Modal footer -->\
+			  <div class='modal-footer'>\
+				<button type='button' class='btn btn-success' id='changePhotographerBtn'>Change</button><button type='button' class='btn btn-danger' data-dismiss='modal'>Close</button>\
 			  </div>\
 \
 			</div>\

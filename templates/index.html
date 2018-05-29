@@ -9,7 +9,13 @@
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" crossorigin="anonymous"></script>  
 		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" crossorigin="anonymous"></script>
 		<script src="../static/jquery.star-rating-svg.js"></script>
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.12.1/bootstrap-table.min.css">
+		<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.12.1/bootstrap-table.min.js"></script>-->
+		<script src="https://rawgit.com/wenzhixin/bootstrap-table/develop/src/bootstrap-table.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.12.1/extensions/mobile/bootstrap-table-mobile.min.js"></script>
+		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css" integrity="sha384-DNOHZ68U8hZfKXOrtjWvjxusGo9WQnrNx2sqG0tfsghAvtVlRW3tvkXWZh58N9jp" crossorigin="anonymous">
 		<link rel="stylesheet" type="text/css" href="../static/star-rating-svg.css">
+		<link href="../static/index.css" rel="stylesheet">
 	</head>
 	<body>
 		<div class="container">
@@ -19,10 +25,12 @@
 			<div class="jumbotron">
 				{{overview}}
 			</div>
-			<footer class="footer">
+			{{alerts}}
+			<footer class='footer'>
 				<p>&copy; Bas Janssen 2018</p>
 			</footer>
 		</div>
+		{{modals}}
 		{{script}}
 	</body>
 </html>

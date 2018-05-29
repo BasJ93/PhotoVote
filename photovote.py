@@ -8,12 +8,13 @@
 #@author: Bas Janssen
 #"""
 
-from flask import Flask, render_template, request, session, Markup, redirect, g, make_response
+from flask import Flask, render_template, request, session, Markup, redirect, g, make_response, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import uuid
 from datetime import timedelta
 import getpass
+import logging
 
 DATABASE = 'photovote.db'
 
@@ -28,6 +29,8 @@ def make_session_permanent():
     session.permanent = True
     app.permanent_session_lifetime = timedelta(minutes = 360)
 
+#In the mobile mode it changes the rows into cards.
+
 @app.route('/')
 def index():
     global NameNumber
@@ -35,25 +38,18 @@ def index():
         pass
     else:
         session['uuid'] = uuid.uuid4()
-    try:
-        if(NameNumber):
-            _photographers = query_db("select ID, NAME, NUMBER from Photographers order by NAME asc;")
-        else:
-            _photographers = query_db("select ID, NAME, NUMBER from Photographers order by NUMBER asc;")
-    except sqlite3.Error as e:
-        return render_template('error.html', error = str(e.args[0]))
     _overview = "<table class='table table-hover'>\n\t\t\t\t<tr><th>Photographers</th></tr>\n"
     _script = "<script>\n\t\t$(document).ready( function() {\n"
-    for row in _photographers:
-        try:
-            row2 = query_db('''select RATING from Ratings where PHOTOGRAPHER=? and DAY=date('now') and USER=?;''', (row[0], session.get('uuid')), True)
-        except sqlite3.Error as e:
-            return render_template('error.html', error = str(e.args[0]))
-        _currentRating = 0
-        if row2 is None:
-            pass
+    try:
+        if(NameNumber):
+            _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NAME asc;", (session.get('uuid'),))
         else:
-            _currentRating = row2[0] or 0
+            _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NUMBER asc;", (session.get('uuid'),))
+    except sqlite3.Error as e:
+        logging.error(str(e.args[0]))
+        return "nok"
+    for row in _photographers:
+        _currentRating = row[3] or 0
         if NameNumber:
             _overview = _overview + "\t\t\t\t<tr>\n\t\t\t\t\t<td>{_name}</td>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t<div id='{_photographer}' class='photo-rating-{_photographer}'></div>\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n".format(_photographer = row[0], _name = row[1])
         else:
@@ -62,7 +58,7 @@ def index():
     _overview = _overview + "\t\t\t</table>"
     _script = _script + "\t\t});\n\t</script>"
     _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/login'>Login</a></li></ul></div></nav>"
-    return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
+    return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), alerts = Markup(""), modals = Markup(""), script=Markup(_script))
 
 @app.route('/overview')
 def overview():
@@ -72,26 +68,52 @@ def overview():
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
+                return "nok"
             if _admins is None:
-                return redirect('/')
+                return "nok"
             else:
                 try:
                     _photographers = query_db("select Photographers.ID, NAME, NUMBER, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;")
                 except sqlite3.Error as e:
                     return render_template('error.html', error = str(e.args[0]))
+                _script = "<script>"
                 _overview = "<div class='table-responsive'><table class='table table-hover'><thead><tr><th id='PhotographerHead'>Photographer</th><th>Average score</th></tr></thead>"
-                _script = "<script>$(document).ready( function() {"
+                _script = _script + "$(document).ready(function() {\n\
+            if($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n});\n"
+                _script = _script + "\n\t\t\t\t\t$(document).ready( function() {\n"
                 for row in _photographers:
                     if NameNumber:
                         _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _TotalScore = row[4] or 0, _votes = row[5] or 0)
                     else:
                         _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><form action='/change_photographer'><input type='hidden' id='ExistingID' name='ExistingID' value='{_photographer}'><button type='submit' class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></form></td></tr></tbody>".format(_photographer = row[0], _name = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
-                    _script = _script + "$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
+                    _script = _script + "\t\t\t\t\t\t$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});\n".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
                 _overview = _overview + "</table></div>"
-                _script = _script + "$('.btn-danger').click(function(event){$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});});"
-                _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');}"
-                _script = _script + "$('#NameNumber').change(function(){$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)});});});</script>"
+                _script = _script + "\t\t\t\t\t\t$('.btn-danger').click(function(event){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});\n\t\t\t\t\t\t});\n"
+                _script = _script + "\t\t\t\t\t\tif($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n"
+                _script = _script + "\t\t\t\t\t\t$('#NameNumber').change(function(){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)})\n\t\t\t\t\t\t;});\n"
+                _script = _script + "\t\t\t\t\t\t$('#addPhotographerBtn').click(\n\
+    		 			function(event) {\n\
+    		 				$.ajax({method: 'POST', url: 'addPhotographer', data: {'inputPhotographer': $('#inputPhotographer').val(), 'inputNumber': $('#inputNumber').val()}}).done(\n\
+    		 					function(html){\n\
+    			 					//Trigger a toast popup confirming the add was successful.\n\
+    			 					//Refresh the table when it has been made dynamic.\n\
+    		 						location.reload(true)\n\
+    	 							});\n\
+    					});\n\
+        				$('#addAdminBtn').click(\n\
+        		 			function(event) {\n\
+        		 				$.ajax({method: 'POST', url: 'addAdmin', data: {'inputUsername': $('#inputUsername').val(), 'inputPassword': $('#inputPassword').val()}}).done(\n\
+        		 					function(html){\n\
+        		 						//Trigger a toast popup confirming the add was successful.\n\
+        		 						//Close the modal.\n\
+        		 						//location.reload(true)\n\
+        		 						$('#addAdminModal').modal('hide');\n\
+        		 						$('#alertAdminSuccess').addClass('show');\n\
+        	 							});\n\
+        					});\n\
+                     });\n\
+           </script>"
                 if NameNumber:
                     _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'>\n\
                 <a class='navbar-brand' href='/'>Photo Vote</a>\n\
@@ -100,8 +122,8 @@ def overview():
                     <ul class='navbar-nav ml-auto'>\n\
                         <li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary active'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li>\n\
                         <li class='nav-item'><a class='nav-link' href='/export_results' target='_blank'>Export Results</a></li>\n\
-                        <li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li>\n\
-                        <li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li>\n\
+                        <li class='nva-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#addPhotographerModal'>Add Photographer</button>\n\
+                        <li class='nva-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#addAdminModal'>Add Admin</button>\n\
                         <li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li>\n\
                     </ul>\n\
                 </div>\n\
@@ -113,14 +135,81 @@ def overview():
                 <div class='collapse navbar-collapse' id='collapsingNavbar'>\n\
                     <ul class='navbar-nav ml-auto'>\n\
                         <li class='nav-item'><div class='btn-group btn-group-toggle' data-toggle='buttons'><label class='btn btn-primary'><input name='NameNumber' id='NameNumber' type='checkbox' autocomplete='off' checked='{_state}'/>Show Names</label></div></li>\n\
+                        <!--<li class='nav-item'><a class='nav-link' href='/addPhotographer'>Add Photographer</a></li>\n-->\
                         <li class='nav-item'><a class='nav-link' href='/export_results' target='_blank'>Export Results</a></li>\n\
-                        <li class='nav-item'><a class='nav-link' href='/add_photographer'>Add Photographer</a></li>\n\
-                        <li class='nav-item'><a class='nav-link' href='/add_admin'>Add Admin</a></li>\n\
+                        <li class='nva-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#addPhotographerModal'>Add Photographer</button>\n\
+                        <li class='nva-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#addAdminModal'>Add Admin</button>\n\
                         <li class='nav-item'><a class='nav-link active' href='/logout'>Logout</a></li>\n\
                     </ul>\n\
                 </div>\n\
             </nav>".format(_state = NameNumber)
-                return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), script=Markup(_script))
+                _alerts = "<div id='alertAdminSuccess' class='alert alert-success alert-dismissible fade collapse' role='alert'>\n\
+				<p class='mb-0'>Admin added</p>\n\
+				<button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>\n\
+			</div>\n\
+			<div id='alertPhotographerSucces' class='alert alert-success alert-dismissible fade collapse' role='alert'>\n\
+				<p class='mb-0'>Photographer added</p>\n\
+				<button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>\n\
+			</div>\n"
+                _modals = "<!-- The Add Photographer Modal -->\
+		<div class='modal' id='addPhotographerModal'>\
+		  <div class='modal-dialog'>\
+			<div class='modal-content'>\
+\
+			  <!-- Modal Header -->\
+			  <div class='modal-header'>\
+				<h4 class='modal-title' id='titleAddPhotographer'>Add Photographer</h4>\
+				<button type='button' class='close' data-dismiss='modal'>&times;</button>\
+			  </div>\
+\
+			  <!-- Modal body -->\
+			  <div class='modal-body'>\
+			  	<form  class='form-signin'>\
+					<label for='inputPhotographer' class='sr-only'>Photographer</label>\
+				  	<input type='text' name='inputPhotographer' id='inputPhotographer' class='form-control' placeholder='Photographer' required autofocus>\
+				  	<label for='inputNumber' class='sr-only'>Photo number</label>\
+				  	<input type='text' name='inputNumber' id='inputNumber' class='form-control' placeholder='1' required>\
+			  	</form>\
+			  </div>\
+\
+			  <!-- Modal footer -->\
+			  <div class='modal-footer'>\
+				<button type='button' class='btn btn-success' id='addPhotographerBtn'>Add</button><button type='button' class='btn btn-danger' data-dismiss='modal'>Close</button>\
+			  </div>\
+\
+			</div>\
+		  </div>\
+		</div>\
+		<!-- The Add Admin Modal -->\
+		<div class='modal' id='addAdminModal'>\
+		  <div class='modal-dialog'>\
+			<div class='modal-content'>\
+\
+			  <!-- Modal Header -->\
+			  <div class='modal-header'>\
+				<h4 class='modal-title'>Add Admin</h4>\
+				<button type='button' class='close' data-dismiss='modal'>&times;</button>\
+			  </div>\
+\
+			  <!-- Modal body -->\
+			  <div class='modal-body'>\
+			  	<form  class='form-signin'>\
+					<label for='inputPhotographer' class='sr-only'>Admin</label>\
+				  	<input type='text' name='inputUsername' id='inputUsername' class='form-control' placeholder='Admin' required autofocus>\
+				  	<label for='inputNumber' class='sr-only'>Password</label>\
+				  	<input type='password' name='inputPassword' id='inputPassword' class='form-control' placeholder='Password' required>\
+			  	</form>\
+			  </div>\
+\
+			  <!-- Modal footer -->\
+			  <div class='modal-footer'>\
+				<button type='button' class='btn btn-success' id='addAdminBtn'>Add</button><button type='button' class='btn btn-danger' data-dismiss='modal'>Close</button>\
+			  </div>\
+\
+			</div>\
+		  </div>\
+		</div>"
+                return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), alerts = Markup(_alerts), modals = Markup(_modals), script = Markup(_script))
         else:
             return redirect('/')
     else:
@@ -132,8 +221,8 @@ def addRating():
         try:
             query_db("insert or replace into Ratings (ID, RATING, USER, PHOTOGRAPHER, DAY) values ((select ID from Ratings where USER = ? and PHOTOGRAPHER = ? and DAY=date('now')), ?, ?, ?, (date('now')));", (session.get('uuid'), request.form['id'], request.form['rating'] , session.get('uuid'), request.form['id']))
         except sqlite3.Error as e:
-            print e.args[0]
-            return render_template('error.html', error = str(e.args[0]))
+            logging.error(str(e.args[0]))
+            return "nok"
         return "ok"
     else:
         return "invalid"
@@ -149,7 +238,8 @@ def login():
         try:
             _pw_hashes = query_db("select PASSWORDHASH, UUID from Admin where NAME=?;", (_username,), True)
         except sqlite3.Error as e:
-            return render_template('error.html', error = str(e.args[0]))
+            logging.error(str(e.args[0]))
+            return "nok"
         if _pw_hashes is None:
             return redirect('/login')
         else:
@@ -160,6 +250,7 @@ def login():
                 session['uuid'] = uuid
                 return redirect('/overview')
             else:
+                #Can I turn this into an alert?
                 return render_template('error.html',error = 'Invalid password.')
     
     if session.get('uuid'):
@@ -167,7 +258,8 @@ def login():
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
+                return "nok"
             if _admins is None:
                 return render_template("login.html", path=Markup("login"), action=Markup("Login"))
             else:
@@ -182,43 +274,45 @@ def logout():
     session.pop('user', None)
     return redirect('/')
 
-@app.route("/add_photographer", methods=['GET', 'POST'])
+@app.route("/addPhotographer", methods=['POST'])
 def add_photographer():
     if session.get('uuid'):
         if session.get('user'):
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
+                return "nok"
             if _admins is None:
-                return redirect('/')
+                return "nok"
             else:
-                if request.method == 'POST':
-                    try:
-                        photographer = request.form['inputPhotographer']
-                        number = request.form['inputNumber']
-                    except Exception as e:
-                        return render_template('error.html', error = str(e))
-                    try:
-                        query_db("insert into Photographers (NAME, NUMBER) values (?, ?);", (photographer, number))
-                    except sqlite3.Error as e:
-                        return render_template('error.html', error = str(e.args[0]))
-                    return redirect('/overview')
+                try:
+                    photographer = request.form['inputPhotographer']
+                    number = request.form['inputNumber']
+                except Exception as e:
+                    logging.error(str(e.args[0]))
+                    return "nok"
+                try:
+                    query_db("insert into Photographers (NAME, NUMBER) values (?, ?);", (photographer, number))
+                except sqlite3.Error as e:
+                    logging.error(str(e.args[0]))
+                    return "nok"
+                return "ok"
                     
-                return render_template('add_photographer.html', path=Markup("/add_photographer"), defaultPhotographer=Markup("Photographer"), defaultNumber=Markup("1"), ExistingID=Markup(""), action=Markup("add"))
         else:
-            return redirect('/')
+            return "nok"
     else:
-        return redirect('/')
+        return "nok"
 
-@app.route("/change_photographer", methods=['GET', 'POST'])
+@app.route("/changePhotographer", methods=['GET', 'POST'])
 def change_photographer():
     if session.get('uuid'):
         if session.get('user'):
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
+                return "nok"
             if _admins is None:
                 return redirect('/')
             else:
@@ -228,11 +322,13 @@ def change_photographer():
                         number = request.form['inputNumber']
                         ExistingID = request.form["ExistingID"]
                     except Exception as e:
-                        return render_template('error.html', error = str(e))
+                        logging.error(str(e.args[0]))
+                        return "nok"
                     try:
                         query_db("update Photographers set NAME=?, NUMBER=? WHERE ID=?;", (photographer, number, ExistingID))
                     except sqlite3.Error as e:
-                        return render_template('error.html', error = str(e.args[0]))
+                        logging.error(str(e.args[0]))
+                        return "nok"
                     return redirect('/overview')
                 
                 currentValues = query_db("select NAME, NUMBER from Photographers WHERE ID=?", (request.args['ExistingID'],), True)
@@ -249,7 +345,7 @@ def removePhotographer():
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
             if _admins is None:
                 return "invalid"
             else:
@@ -257,47 +353,48 @@ def removePhotographer():
                         data = request.form['id'].split("-")
                         photographer = data[2]
                     except Exception as e:
-                        print (e)
+                        logging.error(str(e.args[0]))
                         return "invalid"
                     try:
                         #I still want to look into a non destructive delete.
                         query_db("delete from Ratings where PHOTOGRAPHER=?;", [photographer])
                         query_db("delete from Photographers where ID=?;", [photographer])
                     except sqlite3.Error as e:
-                        print (e)
+                        logging.error(str(e.args[0]))
                         return "invalid"
                     return "ok"
         else:
             return "invalid"
 
-@app.route("/add_admin", methods=['GET', 'POST'])
+@app.route("/addAdmin", methods=['POST'])
 def add_admin():
     if session.get('uuid'):
         if session.get('user'):
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
+                return "nok"
             if _admins is None:
-                return redirect('/')
+                return "nok"
             else:
-                if request.method == 'POST':
-                    try:
-                        _username = request.form['inputUsername']
-                        _password = request.form['inputPassword']
-                    except Exception as e:
-                        return render_template('error.html', error = str(e))
-                    try:
-                        query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (str(uuid.uuid4()), _username, generate_password_hash(_password)))
-                    except sqlite3.Error as e:
-                        return render_template('error.html', error = str(e.args[0]))
-                    return redirect('/overview')
-                    
-                return render_template("login.html", path=Markup("add_admin"), action=Markup("Add Admin"))
+                try:
+                    _username = request.form['inputUsername']
+                    _password = request.form['inputPassword']
+                except Exception as e:
+                    logging.error(str(e.args[0]))
+                    return "nok"
+                try:
+                    query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (str(uuid.uuid4()), _username, generate_password_hash(_password)))
+                except sqlite3.Error as e:
+                    logging.error(str(e.args[0]))
+                    return "nok"
+                return "ok"
+
         else:
-            return redirect('/')
+            return "nok"
     else:
-        return redirect('/')
+        return "nok"
 
 @app.route("/changenamenumber", methods=['POST'])
 def changenamenumber():
@@ -307,7 +404,7 @@ def changenamenumber():
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
             if _admins is None:
                 return "nok"
             else:
@@ -315,10 +412,12 @@ def changenamenumber():
                     try:
                         _state = request.form['state']
                     except Exception as e:
+                        logging.error(str(e.args[0]))
                         return "nok"
                     try:
                             query_db("update Settings Set VALUE=? where NAME='NameNumber';", (_state,))
                     except sqlite3.Error as e:
+                        logging.error(str(e.args[0]))
                         return "nok"
                     if _state == "false":
                         NameNumber = False
@@ -339,8 +438,10 @@ def export_results():
             try:
                 _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
             except sqlite3.Error as e:
-                return render_template('error.html', error = str(e.args[0]))
+                logging.error(str(e.args[0]))
+                return None
             if _admins is None:
+                logging.warning("Request failed: User not logged in as admin.")
                 return "nok"
             else:
                 csv = "Name, Number, Avg Points, Total Points, Number of votes\n"
@@ -362,16 +463,31 @@ def get_db():
     return db
 
 def query_db(query, args=(), one=False):
-    #print(query.replace('?', '%s') % args)
+    logging.debug(query.replace('?', '%s') % args)
     try:
         cur = get_db().execute(query, args)
         get_db().commit()
     except sqlite3.Error as e:
-        print e
+        logging.error(str(e.args[0]))
         return None
     rv = cur.fetchall()
     cur.close()
     return (rv[0] if rv else None) if one else rv
+
+def json_query_db(query, args=(), one=False):
+    try:
+        cur = get_db().execute(query, args)
+        get_db().commit()
+    except sqlite3.Error as e:
+        logging.error(str(e.args[0]))
+        return None
+    rv = cur.fetchall()
+    columns = [column[0] for column in cur.description]
+    cur.close()
+    results = []
+    for row in rv:
+        results.append(dict(zip(columns, row)))
+    return results if results else None
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -380,6 +496,7 @@ def close_connection(exception):
         db.close()
 
 if __name__=="__main__":
+    logging.basicConfig(filename='photovote.log', level=logging.ERROR)
     with app.app_context():
         query_db('''PRAGMA foreign_keys = ON;''')
         query_db('''create table if not exists Admin(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, UUID TEXT, NAME TEXT, PASSWORDHASH TEXT);''') #The password must be hashed, plaintext can not be used.
@@ -391,7 +508,7 @@ if __name__=="__main__":
         try:
             _admins = query_db("select ID from Admin;", (), True)
         except sqlite3.Error as e:
-            print (str(e.args[0]))
+            logging.error(str(e.args[0]))
         if _admins is None:
             print ("No admins found on startup. Please add an admin using the following promts.")
             username = raw_input("Username: ")
@@ -399,7 +516,7 @@ if __name__=="__main__":
             try:
                 query_db("insert into Admin (UUID, NAME, PASSWORDHASH) values (?, ?, ?);", (str(uuid.uuid4()), username, generate_password_hash(password)))
             except sqlite3.Error as e:
-                print (str(e.args[0]))
+                logging.error(str(e.args[0]))
             print("Thank you, Admin has been added.")
             username = None
             password = None
@@ -414,7 +531,7 @@ if __name__=="__main__":
                 else:
                     NameNumber = False
         except sqlite3.Error as e:
-            print (str(e.args[0]))
+            logging.error(str(e.args[0]))
     app.run(host='127.0.0.1', port=8000)
     
     while True:

@@ -16,7 +16,7 @@ from datetime import timedelta
 import getpass
 import logging
 
-DATABASE = 'photovote.db'
+DATABASE = 'photovote-remote.db'
 
 #Ture means show the name, False means show the number
 NameNumber = False
@@ -37,7 +37,7 @@ def index():
     if session.get('uuid'):
         pass
     else:
-        session['uuid'] = uuid.uuid4()
+        session['uuid'] = str(uuid.uuid4())
     _overview = "<table class='table table-hover'>\n\t\t\t\t<tr><th>Photographers</th></tr>\n"
     _script = "<script>\n\t\t$(document).ready( function() {\n"
     try:
@@ -513,7 +513,7 @@ def close_connection(exception):
         db.close()
 
 if __name__=="__main__":
-    logging.basicConfig(filename='photovote.log', level=logging.ERROR)
+    logging.basicConfig(filename='photovote.log', level=logging.DEBUG)
     with app.app_context():
         query_db('''PRAGMA foreign_keys = ON;''')
         query_db('''create table if not exists Admin(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, UUID TEXT, NAME TEXT, PASSWORDHASH TEXT);''') #The password must be hashed, plaintext can not be used.

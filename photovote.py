@@ -279,7 +279,7 @@ def login():
             _pw_hashes = query_db("select PASSWORDHASH, UUID from Admin where NAME=?;", (_username,), True)
         except sqlite3.Error as e:
             logging.error(str(e.args[0]))
-            return "nok"
+             return redirect('/login')
         if _pw_hashes is None:
             return redirect('/login')
         else:
@@ -344,7 +344,7 @@ def add_photographer():
     else:
         return "nok"
 
-@app.route("/changePhotographer", methods=['GET', 'POST'])
+@app.route("/changePhotographer", methods=['POST'])
 def change_photographer():
     if session.get('uuid'):
         if session.get('user'):
@@ -354,25 +354,21 @@ def change_photographer():
                 logging.error(str(e.args[0]))
                 return "nok"
             if _admins is None:
-                return redirect('/')
+                return "nok"
             else:
-                if request.method == 'POST':
-                    try:
-                        photographer = request.form['inputPhotographer']
-                        number = request.form['inputNumber']
-                        ExistingID = request.form["ExistingID"]
-                    except Exception as e:
-                        logging.error(str(e.args[0]))
-                        return "nok"
-                    try:
-                        query_db("update Photographers set NAME=?, NUMBER=? WHERE ID=?;", (photographer, number, ExistingID))
-                    except sqlite3.Error as e:
-                        logging.error(str(e.args[0]))
-                        return "nok"
-                    return redirect('/overview')
-                
-                currentValues = query_db("select NAME, NUMBER from Photographers WHERE ID=?", (request.args['ExistingID'],), True)
-                return render_template('add_photographer.html', path=Markup("/change_photographer"),  defaultPhotographer=Markup(currentValues['NAME']), defaultNumber=Markup(currentValues['NUMBER']), ExistingID=Markup(request.args['ExistingID']), action=Markup("change"))
+                try:
+                    photographer = request.form['inputPhotographer']
+                    number = request.form['inputNumber']
+                    ExistingID = request.form["ExistingID"]
+                except Exception as e:
+                    logging.error(str(e.args[0]))
+                    return "nok"
+                try:
+                    query_db("update Photographers set NAME=?, NUMBER=? WHERE ID=?;", (photographer, number, ExistingID))
+                except sqlite3.Error as e:
+                    logging.error(str(e.args[0]))
+                    return "nok"
+                return "ok"
         else:
             return redirect('/')
     else:
@@ -387,24 +383,24 @@ def removePhotographer():
             except sqlite3.Error as e:
                 logging.error(str(e.args[0]))
             if _admins is None:
-                return "invalid"
+                return "nok"
             else:
                     try:
                         data = request.form['id'].split("-")
                         photographer = data[2]
                     except Exception as e:
                         logging.error(str(e.args[0]))
-                        return "invalid"
+                        return "nok"
                     try:
                         #I still want to look into a non destructive delete.
                         query_db("delete from Ratings where PHOTOGRAPHER=?;", [photographer])
                         query_db("delete from Photographers where ID=?;", [photographer])
                     except sqlite3.Error as e:
                         logging.error(str(e.args[0]))
-                        return "invalid"
+                        return "nok"
                     return "ok"
         else:
-            return "invalid"
+            return "nok"
 
 @app.route("/addAdmin", methods=['POST'])
 def add_admin():
@@ -447,25 +443,21 @@ def changenamenumber():
                 logging.error(str(e.args[0]))
             if _admins is None:
                 return "nok"
+            try:
+                _state = request.form['state']
+            except Exception as e:
+                logging.error(str(e.args[0]))
+                return "nok"
+            try:
+                    query_db("update Settings Set VALUE=? where NAME='NameNumber';", (_state,))
+            except sqlite3.Error as e:
+                logging.error(str(e.args[0]))
+                return "nok"
+            if _state == "false":
+                NameNumber = False
             else:
-                if request.method == 'POST':
-                    try:
-                        _state = request.form['state']
-                    except Exception as e:
-                        logging.error(str(e.args[0]))
-                        return "nok"
-                    try:
-                            query_db("update Settings Set VALUE=? where NAME='NameNumber';", (_state,))
-                    except sqlite3.Error as e:
-                        logging.error(str(e.args[0]))
-                        return "nok"
-                    if _state == "false":
-                        NameNumber = False
-                    else:
-                        NameNumber = True
-                    return "ok"
-                else:
-                    return "nok"
+                NameNumber = True
+            return "ok"
         else:
             return "nok"
     else:
@@ -514,21 +506,6 @@ def query_db(query, args=(), one=False):
     cur.close()
     return (rv[0] if rv else None) if one else rv
 
-def json_query_db(query, args=(), one=False):
-    try:
-        cur = get_db().execute(query, args)
-        get_db().commit()
-    except sqlite3.Error as e:
-        logging.error(str(e.args[0]))
-        return None
-    rv = cur.fetchall()
-    columns = [column[0] for column in cur.description]
-    cur.close()
-    results = []
-    for row in rv:
-        results.append(dict(zip(columns, row)))
-    return results if results else None
-
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, '_database', None)
@@ -564,7 +541,7 @@ if __name__=="__main__":
         try:
             _NameNumber = query_db("select VALUE from Settings where NAME=?;", ('NameNumber',), one=True)    
             if _NameNumber is None:
-                print "Something went wrong with the settings."
+                loggin.error("Something went wrong with the settings.")
             else:
                 if _NameNumber['VALUE'] == "true":
                     NameNumber = True

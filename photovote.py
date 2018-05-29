@@ -279,7 +279,7 @@ def login():
             _pw_hashes = query_db("select PASSWORDHASH, UUID from Admin where NAME=?;", (_username,), True)
         except sqlite3.Error as e:
             logging.error(str(e.args[0]))
-             return redirect('/login')
+            return redirect('/login')
         if _pw_hashes is None:
             return redirect('/login')
         else:

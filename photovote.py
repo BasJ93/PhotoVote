@@ -16,7 +16,7 @@ from datetime import timedelta
 import getpass
 import logging
 
-DATABASE = 'photovote-remote.db'
+DATABASE = 'photovote.db'
 
 #Ture means show the name, False means show the number
 NameNumber = False
@@ -541,7 +541,7 @@ if __name__=="__main__":
         try:
             _NameNumber = query_db("select VALUE from Settings where NAME=?;", ('NameNumber',), one=True)    
             if _NameNumber is None:
-                loggin.error("Something went wrong with the settings.")
+                logging.error("Something went wrong with the settings.")
             else:
                 if _NameNumber['VALUE'] == "true":
                     NameNumber = True

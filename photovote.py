@@ -407,7 +407,7 @@ def getOverview():
                 _script = "<script>"
                 _overview = "<table class='table table-hover'><thead><tr><th id='PhotographerHead'>Photographer</th><th>Average score</th></tr></thead>"
                 _script = _script + "$(document).ready(function() {\n\
-            if($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n"
+            if($(window).width() < 544){$('#PhotographerHead').text('Photo');$('body').css('padding-top', '0px');}else{$('.container').removeClass('m-0 p-0');$('.header').removeClass('m-o p-o');$('.jumbotron').removeClass('m-0 p-0');}\n"
                 for row in _photographers:
                     if NameNumber:
                         _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
@@ -425,8 +425,9 @@ def getOverview():
 
 @app.route("/getVote")
 def getVote():
-    _overview = "<table class='table table-hover'>\n\t\t\t\t<tr><th>Photographers</th></tr>\n"
+    _overview = "<table class='table table-hover'>\n\t\t\t\t<tr><th id='PhotographerHead'>Photographers</th></tr>\n"
     _script = "<script>\n\t\t$(document).ready( function() {\n"
+    _script = _script + "if($(window).width() < 544){$('#PhotographerHead').text('Photo');$('body').css('padding-top', '0px');}else{$('.container').removeClass('m-0 p-0');$('.header').removeClass('m-o p-o');$('.jumbotron').removeClass('m-0 p-0');}\n"
     try:
         if(NameNumber):
             _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NAME asc;", (session.get('uuid'),))

@@ -7,20 +7,20 @@
 		<link rel="icon" sizes="192x192" href="images/icons-192.png">
 		<link rel="apple-touch-icon" href="images/icons-192.png">
 		<link rel= "manifest" href="/manifest.json">
-		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
-		<link rel="stylesheet" href="index.css" type="text/css">
-		<link rel="stylesheet" type="text/css" href="star-rating-svg.css">
+		<link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+		<link rel="stylesheet" type="text/css" href="/index.css">
+		<link rel="stylesheet" type="text/css" href="/star-rating-svg.css">
 		<script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>  
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" crossorigin="anonymous"></script>  
 		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" crossorigin="anonymous"></script>
 		<script src="jquery.star-rating-svg.js"></script>
 	</head>
 	<body>
-		<div class="container">
-			<div class="header">
+		<div id="outer-container" class="container m-0 p-0">
+			<div class="header mt-0 pt-0 sticky-top">
 				{{navbar}}
-			</div>  
-			<div class="jumbotron">
+			</div>
+			<div id="inner-container" class="jumbotron m-0 p-0">
 				{{overview}}
 			</div>
 			{{alerts}}

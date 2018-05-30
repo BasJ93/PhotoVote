@@ -73,13 +73,13 @@ def overview():
                 _script = _script + "\t\t\t\t\t\t$('body').on('click', '.btn-warning', function(event){\n\t\t\t\t\t\t\tvar IDnumber = $(event.target).attr('id').split('-');$('#ExistingID').val(IDnumber[2]);\n$('#inputChangePhotographer').val($('#Name-ID-'+IDnumber[2]).val());\n$('#inputChangeNumber').val($('#Number-ID-'+IDnumber[2]).val());\n$('#changePhotographerModal').modal('show');\n\t\t\t\t\t\t});\n"
                 _script = _script + "\t\t\t\t\t\t$('body').on('click', '.btn-danger', function(event){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){updateTable()\n});})\n"#
                 _script = _script + "\t\t\t\t\t\tif($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n"
-                _script = _script + "\t\t\t\t\t\t$('#NameNumber').change(function(){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)})\n\t\t\t\t\t\t;});\n"
+                _script = _script + "\t\t\t\t\t\t$('#NameNumber').change(function(){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){updateTable();})\n\t\t\t\t\t\t;});\n"
                 _script = _script + "\t\t\t\t\t\t$('#addPhotographerBtn').click(\n\
     		 			function(event) {\n\
     		 				$.ajax({method: 'POST', url: 'addPhotographer', data: {'inputPhotographer': $('#inputPhotographer').val(), 'inputNumber': $('#inputNumber').val()}}).done(\n\
     		 					function(html){\n\
     			 					//Trigger a toast popup confirming the add was successful.\n\
-                                           $('#changePhotographerModal').modal('hide');\n\
+                                           $('#addPhotographerModal').modal('hide');\n\
     		 						updateTable()\n\
     	 							});\n\
     					});\n\

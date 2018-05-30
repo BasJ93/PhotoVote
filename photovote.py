@@ -8,7 +8,7 @@
 #@author: Bas Janssen
 #"""
 
-from flask import Flask, render_template, request, session, Markup, redirect, g, make_response, jsonify
+from flask import Flask, render_template, request, session, Markup, redirect, g, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import uuid
@@ -21,7 +21,7 @@ DATABASE = 'photovote.db'
 #Ture means show the name, False means show the number
 NameNumber = False
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='') #Set the static url path to /. This will present the static folder as part of /
 app.secret_key = 'This is a really secret key for this app'
 
 @app.before_request
@@ -38,25 +38,19 @@ def index():
         pass
     else:
         session['uuid'] = str(uuid.uuid4())
-    _overview = "<table class='table table-hover'>\n\t\t\t\t<tr><th>Photographers</th></tr>\n"
-    _script = "<script>\n\t\t$(document).ready( function() {\n"
-    try:
-        if(NameNumber):
-            _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NAME asc;", (session.get('uuid'),))
-        else:
-            _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NUMBER asc;", (session.get('uuid'),))
-    except sqlite3.Error as e:
-        logging.error(str(e.args[0]))
-        return "nok"
-    for row in _photographers:
-        _currentRating = row[3] or 0
-        if NameNumber:
-            _overview = _overview + "\t\t\t\t<tr>\n\t\t\t\t\t<td>{_name}</td>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t<div id='{_photographer}' class='photo-rating-{_photographer}'></div>\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n".format(_photographer = row[0], _name = row[1])
-        else:
-            _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[2])
-        _script = _script + "\t\t\t$('{_photographer}').starRating({{useFullStars: true, starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});\n".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
-    _overview = _overview + "\t\t\t</table>"
-    _script = _script + "\t\t});\n\t</script>"
+    _overview = "<div id='tableOverview' class='table-responsive'>\n</div>"
+    _script = "<script>\n\
+                    if('serviceWorker' in navigator) {\n\
+                        window.addEventListener('load', function() {\n\
+                            navigator.serviceWorker.register('/sw.js').then(function(registration){\n\
+                                console.log('ServiceWorker registration successfull with scope: ', registration.scope);}, function(err) {console.log('ServiceWoerker registration failed: ', err);});});}\n\
+                    $(document).ready(function() {\n\
+                        updateTable();\n\
+                    });\n\
+                    function updateTable() {\n\
+                     \t$.get('/getVote', function(data) {$('#tableOverview').html(data);});\n\
+                     }\n\
+           </script>"
     _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/login'>Login</a></li></ul></div></nav>"
     return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), alerts = Markup(""), modals = Markup(""), script=Markup(_script))
 
@@ -73,24 +67,11 @@ def overview():
             if _admins is None:
                 return "nok"
             else:
-                try:
-                    _photographers = query_db("select Photographers.ID, NAME, NUMBER, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;")
-                except sqlite3.Error as e:
-                    return render_template('error.html', error = str(e.args[0]))
+                _overview = "<div id='tableOverview' class='table-responsive'>\n</div>"
                 _script = "<script>"
-                _overview = "<div class='table-responsive'><table class='table table-hover'><thead><tr><th id='PhotographerHead'>Photographer</th><th>Average score</th></tr></thead>"
-                _script = _script + "$(document).ready(function() {\n\
-            if($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n});\n"
-                _script = _script + "\n\t\t\t\t\t$(document).ready( function() {\n"
-                for row in _photographers:
-                    if NameNumber:
-                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
-                    else:
-                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_number}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
-                    _script = _script + "\t\t\t\t\t\t$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});\n".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
-                _overview = _overview + "</table></div>"
-                _script = _script + "\t\t\t\t\t\t$('.btn-warning').click(function(event){\n\t\t\t\t\t\t\tvar IDnumber = $(event.target).attr('id').split('-');$('#ExistingID').val(IDnumber[2]);\n$('#inputChangePhotographer').val($('#Name-ID-'+IDnumber[2]).val());\n$('#inputChangeNumber').val($('#Number-ID-'+IDnumber[2]).val());\n$('#changePhotographerModal').modal('show');\n\t\t\t\t\t\t});\n"
-                _script = _script + "\t\t\t\t\t\t$('.btn-danger').click(function(event){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){location.reload(true)});})\n"#
+                _script = _script + "$(document).ready(function() {\n"
+                _script = _script + "\t\t\t\t\t\t$('body').on('click', '.btn-warning', function(event){\n\t\t\t\t\t\t\tvar IDnumber = $(event.target).attr('id').split('-');$('#ExistingID').val(IDnumber[2]);\n$('#inputChangePhotographer').val($('#Name-ID-'+IDnumber[2]).val());\n$('#inputChangeNumber').val($('#Number-ID-'+IDnumber[2]).val());\n$('#changePhotographerModal').modal('show');\n\t\t\t\t\t\t});\n"
+                _script = _script + "\t\t\t\t\t\t$('body').on('click', '.btn-danger', function(event){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'removePhotographer', data: {'id': $(event.target).attr('id')}}).done(function(html){updateTable()\n});})\n"#
                 _script = _script + "\t\t\t\t\t\tif($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n"
                 _script = _script + "\t\t\t\t\t\t$('#NameNumber').change(function(){\n\t\t\t\t\t\t\t$.ajax({method: 'POST', url: 'changenamenumber', data: {'state': this.checked}}).done(function(html){window.location.reload(true);console.log(html)})\n\t\t\t\t\t\t;});\n"
                 _script = _script + "\t\t\t\t\t\t$('#addPhotographerBtn').click(\n\
@@ -98,8 +79,8 @@ def overview():
     		 				$.ajax({method: 'POST', url: 'addPhotographer', data: {'inputPhotographer': $('#inputPhotographer').val(), 'inputNumber': $('#inputNumber').val()}}).done(\n\
     		 					function(html){\n\
     			 					//Trigger a toast popup confirming the add was successful.\n\
-    			 					//Refresh the table when it has been made dynamic.\n\
-    		 						location.reload(true)\n\
+                                           $('#changePhotographerModal').modal('hide');\n\
+    		 						updateTable()\n\
     	 							});\n\
     					});\n\
                          $('#changePhotographerBtn').click(\n\
@@ -107,8 +88,8 @@ def overview():
         		 				$.ajax({method: 'POST', url: 'changePhotographer', data: {'ExistingID': $('#ExistingID').val(), 'inputPhotographer': $('#inputChangePhotographer').val(), 'inputNumber': $('#inputChangeNumber').val()}}).done(\n\
         		 					function(html){\n\
         			 					//Trigger a toast popup confirming the add was successful.\n\
-        			 					//Refresh the table when it has been made dynamic.\n\
-        		 						location.reload(true)\n\
+                                                $('#changePhotographerModal').modal('hide');\n\
+        			 					updateTable()\n\
         	 							});\n\
     					});\n\
         				$('#addAdminBtn').click(\n\
@@ -122,7 +103,11 @@ def overview():
         		 						$('#alertAdminSuccess').addClass('show');\n\
         	 							});\n\
         					});\n\
+                         updateTable();\n\
                      });\n\
+                     function updateTable() {\n\
+                     \t$.get('/getOverview', function(data) {$('#tableOverview').html(data);});\n\
+                     }\n\
            </script>"
                 if NameNumber:
                     _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'>\n\
@@ -402,6 +387,66 @@ def removePhotographer():
         else:
             return "nok"
 
+@app.route('/getOverview')
+def getOverview():
+    global NameNumber
+    if session.get('uuid'):
+        if session.get('user'):
+            try:
+                _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
+            except sqlite3.Error as e:
+                logging.error(str(e.args[0]))
+                return "nok"
+            if _admins is None:
+                return "nok"
+            else:
+                try:
+                    _photographers = query_db("select Photographers.ID, NAME, NUMBER, avg(RATING), sum(RATING), COUNT(RATING) from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;")
+                except sqlite3.Error as e:
+                    return render_template('error.html', error = str(e.args[0]))
+                _script = "<script>"
+                _overview = "<table class='table table-hover'><thead><tr><th id='PhotographerHead'>Photographer</th><th>Average score</th></tr></thead>"
+                _script = _script + "$(document).ready(function() {\n\
+            if($(window).width() < 544){$('#PhotographerHead').text('Photo');}\n"
+                for row in _photographers:
+                    if NameNumber:
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                    else:
+                        _overview = _overview + "<tbody><tr class='clickable' data-toggle='collapse' data-target='#options-{_photographer}' aria-expanded='false' aria-controls='options-{_photographer}'><td>{_number}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr></tbody><tbody id='options-{_photographer}' class='collapse'><tr><td>Votes: {_votes}</td><td>Total Score: {_TotalScore}</td></tr><tr><td><button type='button' class='btn btn-danger' id='btn-remove-{_photographer}'>Remove</button></td><td><input type='hidden' id='Number-ID-{_photographer}' value='{_number}'><input type='hidden' id='Name-ID-{_photographer}' value='{_name}'><button class='btn btn-warning' id='btn-rename-{_photographer}'>Rename</button></td></tr></tbody>".format(_photographer = row[0], _name = row[1], _number = row[2], _TotalScore = row[4] or 0, _votes = row[5] or 0)
+                    _script = _script + "\t\t\t\t\t\t$('{_photographer}').starRating({{starSize: 25, readOnly: true, initialRating: {_rating}}});\n".format(_photographer = ".photo-rating-" + str(row[0]), _rating = row[3] or 0)
+                _overview = _overview + "</table>"
+                _script = _script + "});</script>"
+                _html = _overview + _script
+                return _html
+        else:
+            return "nok"
+    else:
+        return "nok"
+
+@app.route("/getVote")
+def getVote():
+    _overview = "<table class='table table-hover'>\n\t\t\t\t<tr><th>Photographers</th></tr>\n"
+    _script = "<script>\n\t\t$(document).ready( function() {\n"
+    try:
+        if(NameNumber):
+            _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NAME asc;", (session.get('uuid'),))
+        else:
+            _photographers = query_db("select Photographers.ID AS ID, NAME, NUMBER, RATING from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') and Ratings.USER=? order by NUMBER asc;", (session.get('uuid'),))
+    except sqlite3.Error as e:
+        logging.error(str(e.args[0]))
+        return "nok"
+    for row in _photographers:
+        _currentRating = row[3] or 0
+        if NameNumber:
+            _overview = _overview + "\t\t\t\t<tr>\n\t\t\t\t\t<td>{_name}</td>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t<div id='{_photographer}' class='photo-rating-{_photographer}'></div>\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n".format(_photographer = row[0], _name = row[1])
+        else:
+            _overview = _overview + "<tr><td>{_name}</td><td><div id='{_photographer}' class='photo-rating-{_photographer}'></div></td></tr>".format(_photographer = row[0], _name = row[2])
+        _script = _script + "\t\t\t$('{_photographer}').starRating({{useFullStars: true, starSize: 25, initialRating: {_rating}, disableAfterRate: false, callback: function(currentRating, $el){{$.post('addRating', {{'id': $el[0].id, 'rating': currentRating}});}}}});\n".format(_photographer = ".photo-rating-" + str(row[0]), _rating = _currentRating)
+    _overview = _overview + "\t\t\t</table>"
+    _script = _script + "\t\t});\n\t</script>" 
+    _html = _overview + _script
+    return _html
+
 @app.route("/addAdmin", methods=['POST'])
 def add_admin():
     if session.get('uuid'):
@@ -479,7 +524,7 @@ def export_results():
                 csv = "Name, Number, Avg Points, Total Points, Number of votes\n"
                 results = query_db("select Photographers.ID, NAME, NUMBER, avg(RATING) AS AVG, sum(RATING) AS TOTAL, COUNT(RATING) AS VOTES from Photographers left join Ratings on Ratings.Photographer = Photographers.ID and Ratings.DAY=date('now') group by Photographers.ID order by sum(RATING) desc;")
                 for row in results:
-                    csv = csv + "{_Name}, {_Number}, {_Avg}, {_Total}, {_Count}\n".format(_Name = row['NAME'], _Number=row['Number'], _Avg=row['AVG'], _Total=row['TOTAL'], _Count=row['VOTES'])
+                    csv = csv + "{_Name}, {_Number}, {_Avg}, {_Total}, {_Count}\n".format(_Name = row['NAME'], _Number = row['Number'], _Avg = row['AVG'] or 0, _Total = row['TOTAL'] or 0, _Count = row['VOTES'] or 0)
                 response = make_response(csv)
                 cd = 'attachment; filename=results.csv'
                 response.headers['Content-Disposition'] = cd

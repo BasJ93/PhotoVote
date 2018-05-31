@@ -2,10 +2,10 @@ var CACHE_NAME = 'PhotoVote-cache-v1';
 	var urlsToCache = [
 		'/',
 		'/index.css',
-		'/jquery-star-rating-svg.js',
+		'/jquery.star-rating-svg.js',
 		'/star-rating-svg.css',
 		'/login',
-		'/overview'
+		'/sorry.html'
 		];
 
 self.addEventListener('install', function(event) {
@@ -25,7 +25,11 @@ self.addEventListener('fetch', function(event) {
 				if (response) {
 					return response;
 				}
-				return fetch(event.request);
+				return fetch(event.request)
+					.catch(function(error)
+						{
+							return caches.match('/sorry.html');
+						});
 			}
 		)
 	);

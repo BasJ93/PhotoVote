@@ -10,6 +10,7 @@
 
 from flask import Flask, render_template, request, session, Markup, redirect, g, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.contrib.fixers import ProxyFix
 import sqlite3
 import uuid
 from datetime import timedelta
@@ -22,6 +23,7 @@ DATABASE = 'photovote.db'
 NameNumber = False
 
 app = Flask(__name__, static_url_path='') #Set the static url path to /. This will present the static folder as part of /
+app.wsgi_app = ProxyFix(app.wsgi_app)
 app.secret_key = 'This is a really secret key for this app'
 
 @app.before_request

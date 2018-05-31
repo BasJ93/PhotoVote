@@ -11,11 +11,17 @@ var CACHE_NAME = 'PhotoVote-cache-v1';
 self.addEventListener('install', function(event) {
 	event.waitUntil(
 		caches.open(CACHE_NAME)
-			.then(function(cache) {
+			.then(function(cache)
+			{
 				console.log('Opened cache');
-				return cache.addAll(urlsToCache);
-			})
-		);
+				return cache.addAll(urlsToCache)
+					.catch(function(error)
+					{
+						console.log(error);
+					});
+			}
+		)
+	);
 });
 
 self.addEventListener('fetch', function(event) {

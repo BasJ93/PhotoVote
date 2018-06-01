@@ -17,13 +17,14 @@ from datetime import timedelta
 import getpass
 import logging
 
-DATABASE = 'photovote.db'
-
 #Ture means show the name, False means show the number
 NameNumber = False
 
-app = Flask(__name__, static_url_path='') #Set the static url path to /. This will present the static folder as part of /
-app.wsgi_app = ProxyFix(app.wsgi_app)
+app = Flask(__name__, static_url_path='', instance_relative_config=True) #Set the static url path to /. This will present the static folder as part of /
+app.config.from_object('config')
+app.config.from_pyfile('config.py')
+if app.config['PROXY']:
+    app.wsgi_app = ProxyFix(app.wsgi_app)
 app.secret_key = 'This is a really secret key for this app'
 
 @app.before_request
@@ -50,6 +51,30 @@ def index():
                                 });\n\
                             });\n\
                         }\n\
+                        let deferredPrompt;\n\
+\n\
+                        window.addEventListener('beforeinstallprompt', (e) => {\n\
+                          // Prevent Chrome 67 and earlier from automatically showing the prompt\n\
+                          e.preventDefault();\n\
+                          // Stash the event so it can be triggered later.\n\
+                          deferredPrompt = e;\n\
+                          $('#inner-container').prepend(\"<button class='btn btn-info' style='width:100%;' click='triggerInstall'>Add to homescreen</button>\");\n\
+                        });\n\
+                        function triggerInstall() {\n\
+                            $('.btn-info').remove();\n\
+                            deferredPrompt.prompt();\n\
+                              // Wait for the user to respond to the prompt\n\
+                              deferredPrompt.userChoice\n\
+                                .then((choiceResult) => {\n\
+                                  if (choiceResult.outcome === 'accepted') {\n\
+                                    console.log('User accepted the A2HS prompt');\n\
+                                  } else {\n\
+                                    console.log('User dismissed the A2HS prompt');\n\
+                                  }\n\
+                                  deferredPrompt = null;\n\
+                                });\n\
+                        }\n\
+\n\
                     $(document).ready(function() {\n\
                         if($(window).width() < 544){\n\
                                 $('body').css('padding-top', '0px');\n\
@@ -59,14 +84,59 @@ def index():
                                 $('.header').removeClass('m-o p-o');\n\
                                 $('.jumbotron').removeClass('m-0 p-0');\n\
                         }\n\
+                        $('#LoginBtn').click(\n\
+    		 			function(event) {\n\
+    		 				$.ajax({method: 'POST', url: 'login', data: {'inputUsername': $('#inputUsername').val(), 'inputPassword': $('#inputPassword').val()}}).done(\n\
+    		 					function(data){\n\
+    			 					if(data === 'ok')\n\
+                                             {\n\
+                                                 window.location = 'overview';\n\
+                                             }\n\
+                                             else\n\
+                                             {\n\
+                                                \n\
+                                             }\n\
+    	 							});\n\
+    					});\n\
                         updateTable();\n\
                     });\n\
                     function updateTable() {\n\
                          $.get('/getVote', function(data) {$('#tableOverview').html(data);});\n\
                      }\n\
            </script>"
-    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'><li class='nav-item'><a class='nav-link active' href='/login'>Login</a></li></ul></div></nav>"
-    return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), alerts = Markup(""), modals = Markup(""), script=Markup(_script))
+    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'>\n\
+    <li class='nva-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#loginModal'>login</button>\n\
+    </ul></div></nav>"
+    _modals = "<!-- The Login Modal -->\
+		<div class='modal' id='loginModal' role='dialog'>\
+		  <div class='modal-dialog'>\
+			<div class='modal-content'>\
+\
+			  <!-- Modal Header -->\
+			  <div class='modal-header bg-primary'>\
+				<h4 class='modal-title text-white' id='titleLogin'>Login</h4>\
+				<button type='button' class='close' data-dismiss='modal'>&times;</button>\
+			  </div>\
+\
+			  <!-- Modal body -->\
+			  <div class='modal-body bg-light'>\
+			  	<form  class='form-signin'>\
+					<label for='inputUsername' class='sr-only'>Username</label>\n\
+                          <input type='text' name='inputUsername' id='inputUsername' class='form-control' placeholder='Username' required autofocus>\n\
+                          <label for='inputPassword' class='sr-only'>Password</label>\n\
+                          <input type='password' name='inputPassword' id='inputPassword' class='form-control' placeholder='Password' required>\n\
+			  	</form>\
+			  </div>\
+     \
+			  <!-- Modal footer -->\
+			  <div class='modal-footer'>\
+				<button type='button' class='btn btn-primary' id='LoginBtn'>Login</button><button type='button' class='btn btn-danger' data-dismiss='modal'>Close</button>\
+			  </div>\
+\
+			</div>\
+		  </div>\
+		</div>\n"
+    return render_template('index.html', navbar = Markup(_navbar), overview = Markup(_overview), alerts = Markup(""), modals = Markup(_modals), script=Markup(_script))
 
 @app.route('/overview')
 def overview():
@@ -269,47 +339,27 @@ def addRating():
     else:
         return "invalid"
 
-@app.route("/login", methods=['GET', 'POST'])
+@app.route("/login", methods=['POST'])
 def login():
-    if request.method == 'POST':
-        try:
-            _username = request.form['inputUsername']
-            _password = request.form['inputPassword']
-        except Exception as e:
-            return render_template('error.html', error = str(e))        
-        try:
-            _pw_hashes = query_db("select PASSWORDHASH, UUID from Admin where NAME=?;", (_username,), True)
-        except sqlite3.Error as e:
-            logging.error(str(e.args[0]))
-            return redirect('/login')
-        if _pw_hashes is None:
-            return redirect('/login')
-        else:
-            pw_hash = _pw_hashes[0]
-            uuid = _pw_hashes[1]
-            if check_password_hash(pw_hash, _password):
-                session['user'] = _username
-                session['uuid'] = uuid
-                return redirect('/overview')
-            else:
-                #Can I turn this into an alert?
-                return render_template('error.html',error = 'Invalid password.')
-    
-    if session.get('uuid'):
-        if session.get('user'):
-            try:
-                _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
-            except sqlite3.Error as e:
-                logging.error(str(e.args[0]))
-                return "nok"
-            if _admins is None:
-                return render_template("login.html", path=Markup("login"), action=Markup("Login"))
-            else:
-                return redirect('/overview')
-        else:
-            return render_template("login.html", path=Markup("login"), action=Markup("Login"))
+    try:
+        _username = request.form['inputUsername']
+        _password = request.form['inputPassword']
+    except Exception as e:
+        return "nok"#render_template('error.html', error = str(e))        
+    try:
+        _pw_hashes = query_db("select PASSWORDHASH, UUID from Admin where NAME=?;", (_username,), True)
+    except sqlite3.Error as e:
+        logging.error(str(e.args[0]))
+        return "nok"#redirect('/login')
+    if _pw_hashes is None:
+        return "nok"#redirect('/login')
     else:
-        return render_template("login.html", path=Markup("login"), action=Markup("Login"))
+        pw_hash = _pw_hashes[0]
+        uuid = _pw_hashes[1]
+        if check_password_hash(pw_hash, _password):
+            session['user'] = _username
+            session['uuid'] = uuid
+            return "ok"#redirect('/overview')
     
 @app.route("/logout")
 def logout():
@@ -553,7 +603,7 @@ def export_results():
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
+        db = g._database = sqlite3.connect(app.config['DATABASE'])
         db.row_factory = sqlite3.Row
     return db
 
@@ -576,7 +626,10 @@ def close_connection(exception):
         db.close()
 
 if __name__=="__main__":
-    logging.basicConfig(filename='photovote.log', level=logging.DEBUG)
+    if app.config['DEBUG']:
+        logging.basicConfig(filename='photovote.log', level=logging.DEBUG)
+    else:
+        logging.basicConfig(filename='photovote.log', level=logging.INFO)
     with app.app_context():
         query_db('''PRAGMA foreign_keys = ON;''')
         query_db('''create table if not exists Admin(ID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, UUID TEXT, NAME TEXT, PASSWORDHASH TEXT);''') #The password must be hashed, plaintext can not be used.

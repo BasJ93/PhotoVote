@@ -4,7 +4,6 @@ var CACHE_NAME = 'PhotoVote-cache-v1';
 		'/index.css',
 		'/jquery.star-rating-svg.js',
 		'/star-rating-svg.css',
-		'/login',
 		'/sorry.html'
 		];
 

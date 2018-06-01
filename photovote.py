@@ -58,7 +58,7 @@ def index():
                           e.preventDefault();\n\
                           // Stash the event so it can be triggered later.\n\
                           deferredPrompt = e;\n\
-                          $('#inner-container').prepend(\"<button class='btn btn-info' style='width:100%;' click='triggerInstall'>Add to homescreen</button>\");\n\
+                          $('#inner-container').prepend(\"<button class='btn btn-info' style='width:100%;' onclick='triggerInstall()'>Add to homescreen</button>\");\n\
                         });\n\
                         function triggerInstall() {\n\
                             $('.btn-info').remove();\n\

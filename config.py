@@ -9,6 +9,6 @@
 #
 
 STATIC_URL_PATH = ''
-DATABASE = 'photovote.py'
+DATABASE = 'photovote.db'
 DEBUG = False
 PROXY = True

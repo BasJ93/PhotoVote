@@ -37,6 +37,13 @@ def make_session_permanent():
 @app.route('/')
 def index():
     global NameNumber
+    try:
+        source = request.args.get('utm_source')
+        if source == 'a2hs':
+            logging.debug("a2hs request received")
+            write_stat(request)
+    except Exception as e:
+        logging.debug(e)
     if session.get('uuid'):
         pass
     else:
@@ -619,11 +626,19 @@ def query_db(query, args=(), one=False):
     cur.close()
     return (rv[0] if rv else None) if one else rv
 
+def write_stat(request):
+    statsfile = open("stats.csv", "a")
+    try:
+        statsfile.write(request.user_agent.platform + ',' + request.user_agent.browser + ',' + request.user_agent.version + '\n')
+    except Exception as e:
+        logging.error(e)
+    statsfile.close()
+
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
-        db.close()
+        db.close()        
 
 if __name__=="__main__":
     if app.config['DEBUG']:

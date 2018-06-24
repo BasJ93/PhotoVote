@@ -1,6 +1,5 @@
 var CACHE_NAME = 'PhotoVote-cache-v1';
 	var urlsToCache = [
-		'/',
 		'/index.css',
 		'/jquery.star-rating-svg.js',
 		'/star-rating-svg.css',

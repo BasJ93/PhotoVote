@@ -111,8 +111,25 @@ def index():
                          $.get('/getVote', function(data) {$('#tableOverview').html(data);});\n\
                      }\n\
            </script>"
-    _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'>\n\
-    <li class='nva-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#loginModal'>login</button>\n\
+    if session.get('user'):
+        try:
+            _admins = query_db("select ID from Admin where NAME=? and UUID=?;", (session.get('user'), session.get('uuid')), True)
+        except sqlite3.Error as e:
+            logging.error(str(e.args[0]))
+            _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'>\n\
+    <li class='nav-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#loginModal'>Login</button>\n\
+    </ul></div></nav>"
+        if _admins is None:
+             _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'>\n\
+    <li class='nav-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#loginModal'>Login</button>\n\
+    </ul></div></nav>"
+        else:
+             _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'>\n\
+    <li class='nav-item'><a class='btn btn-primary' href='/overview' role='button'>Login</a>\n\
+    </ul></div></nav>" #<button type='button' class='btn btn-primary' data-toggle='modal' data-target='#loginModal'>login</button>
+    else:
+        _navbar = "<nav class='navbar navbar-expand-md bg-primary navbar-dark'><span class='navbar-brand'>Photo Vote</span><button class='navbar-toggler navbar-toggler-right' type='button' data-toggle='collapse' data-target='#collapsingNavbar'><span class='navbar-toggler-icon'></span></button><div class='collapse navbar-collapse' id='collapsingNavbar'><ul class='navbar-nav ml-auto'>\n\
+    <li class='nav-item'><button type='button' class='btn btn-primary' data-toggle='modal' data-target='#loginModal'>Login</button>\n\
     </ul></div></nav>"
     _modals = "<!-- The Login Modal -->\
 		<div class='modal' id='loginModal' role='dialog'>\

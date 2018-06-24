@@ -53,8 +53,26 @@ def index():
                     if('serviceWorker' in navigator) {\n\
                         window.addEventListener('load', function() {\n\
                             navigator.serviceWorker.register('/sw.js').then(function(registration){\n\
-                                console.log('ServiceWorker registration successfull with scope: ', registration.scope);}, function(err) {\n\
-                                    console.log('ServiceWoerker registration failed: ', err);\n\
+                            registration.update();\n\
+                            registration.onupdatefound = function() {\n\
+                                var installingWorker = registration.installing;\n\
+                                installingWorker.onstatechange = function() {\n\
+                                    switch(installingWorker.state) {\n\
+                                        case 'installed':\n\
+                                            if(navigator.serviceWorker.controller) {\n\
+                                                console.log('New or updated serviceworker installed');\n\
+                                            } else {\n\
+                                                console.log('ServiceWorker registration successfull');\n\
+                                            }\n\
+                                            break;\n\
+                                        case 'redundant':\n\
+                                            console.log('Service worker became redundant.');\n\
+                                            break;\n\
+                                        }\n\
+                                    };\n\
+                                };\n\
+                                }).catch(function(e) {\n\
+                                    console.log('Error during serviceWorker registration:', e);\n\
                                 });\n\
                             });\n\
                         }\n\
